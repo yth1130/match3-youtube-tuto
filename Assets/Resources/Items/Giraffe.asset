@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1ca4d4ae6b386cd0adb4c67bb5e40ab, type: 3}
+  m_Name: Giraffe
+  m_EditorClassIdentifier: 
+  value: 5
+  sprite: {fileID: 21300000, guid: 52870704a43e0d956856c00e7097761c, type: 3}
