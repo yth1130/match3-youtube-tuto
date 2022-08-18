@@ -9,12 +9,20 @@ public sealed class Board : MonoBehaviour
 {
     public static Board Instance { get; private set; }
 
-    public Row[] rows;
+    [SerializeField] private AudioClip collectSound;
+    [SerializeField] private AudioSource audioSource;
+
+    [SerializeField] GameObject rowPrefab;
+    public int Width;  //=> Tiles.GetLength(dimension: 0);
+    public int Height; // => Tiles.GetLength(dimension: 1);
+
+    // public Row[] rows;
+    public List<Row> rows;
 
     public Tile[,] Tiles { get; private set; }
 
-    public int Width => Tiles.GetLength(dimension: 0);
-    public int Height => Tiles.GetLength(dimension: 1);
+    // public int Width => Tiles.GetLength(dimension: 0);
+    // public int Height => Tiles.GetLength(dimension: 1);
 
     private readonly List<Tile> _selection = new List<Tile>();
 
@@ -22,9 +30,54 @@ public sealed class Board : MonoBehaviour
 
     private void Awake() => Instance = this;
 
+#if UNITY_EDITOR
+    [SerializeField] bool refresh;
+    private void OnValidate()
+    {
+        if (refresh == true)
+        {
+            refresh = false;
+            Refresh();
+            return;
+        }
+
+    }
+    void Refresh()
+    {
+        if (rows != null)
+        {
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (rows[i] == null)
+                    continue;
+                StartCoroutine(DestroyRoutine(rows[i].gameObject));
+            }
+            rows = null;
+        }
+
+        rows = new List<Row>();
+        for (int i = 0; i < Height; i++)
+        {
+            var rowInstance = Instantiate(rowPrefab);
+            rowInstance.transform.SetParent(transform);
+            rowInstance.transform.localScale = Vector3.one;
+
+            var row = rowInstance.GetComponent<Row>();
+            row.Refresh(Width);
+            rows.Add(row);
+        }
+    }
+    // https://answers.unity.com/questions/1318576/destroy-child-objects-onvalidate.html
+    IEnumerator DestroyRoutine(GameObject go)
+    {
+        yield return null;
+        DestroyImmediate(go);
+    }
+#endif
+
     private void Start()
     {
-        Tiles = new Tile[rows.Max(row => row.tiles.Length), rows.Length];
+        Tiles = new Tile[rows.Max(row => row.tiles.Count), rows.Count];
 
         for (int y = 0; y < Height; y++)
         {
@@ -40,18 +93,53 @@ public sealed class Board : MonoBehaviour
             }
         }
 
-
+        Pop();
     }
 
-    public void Select(Tile tile)
+    private void Update()
+    {
+        if (!Input.GetKeyDown(KeyCode.A))
+            return;
+        
+        foreach (var connectedTile in Tiles[0,0].GetConnectedTiles())
+        {
+            connectedTile.icon.transform.DOScale(1.25f, TweenDuration).Play();
+        }
+    }
+
+    public async void Select(Tile tile)
     {
         if (_selection.Contains(tile) == false)
-            _selection.Add(tile);
+        {
+            if (_selection.Count > 0)
+            {
+                if (System.Array.IndexOf(_selection[0].Neighbours, tile) != -1)
+                {
+                  _selection.Add(tile);
+                }
+            }
+            else
+            {
+                _selection.Add(tile);
+            }
+        }
+
 
         if (_selection.Count < 2)
             return;
 
         print($"Selected tiles at ({_selection[0].x}, {_selection[0].y}) and ({_selection[1].x}, {_selection[1].y})");
+
+        await Swap(_selection[0], _selection[1]);
+
+        if (CanPop())
+        {
+            Pop();
+        }
+        else
+        {
+            await Swap(_selection[0], _selection[1]);
+        }
 
         _selection.Clear();
     }
@@ -78,8 +166,137 @@ public sealed class Board : MonoBehaviour
         tile2.icon = icon1;
 
         var tile1Item = tile1.Item;
-
         tile1.Item = tile2.Item;
         tile2.Item = tile1Item;
+    }
+
+    private bool CanPop()
+    {
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                if (Tiles[x, y].GetConnectedTiles().Skip(1).Count() >= 2)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private async void Pop()
+    {
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                var tile = Tiles[x, y];
+
+                var connectedTiles = tile.GetConnectedTiles();
+                
+                if (connectedTiles.Skip(1).Count() < 2)
+                    continue;
+                
+                var deflateSequence = DOTween.Sequence();
+                foreach(var connectedTile in connectedTiles)
+                {
+                    deflateSequence.Join(connectedTile.icon.transform.DOScale(Vector3.zero, TweenDuration));
+                }
+                audioSource.PlayOneShot(collectSound);
+                ScoreCounter.Instance.Score += tile.Item.value * connectedTiles.Count;
+                await deflateSequence.Play().AsyncWaitForCompletion();
+
+
+
+                // 연결된 타일들은 정해짐.
+                // 연결된 타일들의 값을 비운다.
+                // 값이 비워진 타일들을 바로 위의 타일로 채워준다.
+                var dropSequence = DOTween.Sequence();
+                foreach (var connectedTile in connectedTiles)
+                {
+                    connectedTile.Item = null;
+                }
+                var emptyTiles = new List<Tile>(connectedTiles);
+                // var emptyTiles = connectedTiles.ToList();
+                // foreach (var emptyTile in emptyTiles)
+                // foreach (var emptyTile in emptyTiles.ToList())
+                for (int i = 0; i < emptyTiles.Count; i++)
+                {
+                    var emptyTile = emptyTiles[i];
+
+                    int dropX = emptyTile.x;
+                    int dropY = emptyTile.y - 1;
+                    Tile dropTile = null;
+                    for (; dropY >= 0; dropY--)
+                    {
+                        if (Tiles[dropX, dropY].Item == null)
+                            continue;
+                        dropTile = Tiles[dropX, dropY];
+                        break;
+                    }
+                    if (dropTile == null)
+                        continue;
+
+
+                    // var dropIcon = dropTile.icon;
+                    // var dropTransform = dropIcon.transform;
+                    // dropSequence.Join(dropTransform.DOMove(emptyTile.icon.transform.position, TweenDuration));
+
+                    emptyTile.icon.sprite = dropTile.icon.sprite;
+                    // Vector3 initPos = emptyTile.icon.transform.position;
+                    Vector3 initPos = emptyTile.transform.position;
+                    emptyTile.icon.transform.position = dropTile.icon.transform.position;
+                    emptyTile.icon.transform.localScale = Vector3.one;
+                    dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration));
+
+                    // dropTransform.SetParent(connectedTile.icon.transform);
+
+                    // tile1.icon = icon2;
+                    // tile2.icon = dropIcon;
+
+                    // var tile1Item = tile1.Item;
+                    // tile1.Item = tile2.Item;
+                    // tile2.Item = tile1Item;
+
+                    emptyTile.Item = dropTile.Item;
+                    dropTile.Item = null;
+                    emptyTiles.Add(dropTile); // selectedTile.Item = null;
+                }
+                await dropSequence.Play().AsyncWaitForCompletion();
+
+
+
+                
+
+                // var inflateSequence = DOTween.Sequence();
+                // foreach (var connectedTile in connectedTiles)
+                // {
+                //     connectedTile.Item = ItemDatabase.Items[Random.Range(0, ItemDatabase.Items.Length)];
+
+                //     inflateSequence.Join(connectedTile.icon.transform.DOScale(Vector3.one, TweenDuration));
+                // }
+                // await inflateSequence.Play().AsyncWaitForCompletion();
+                await FillEmpty();
+
+                x = 0;
+                y = 0;
+            }
+        }
+    }
+
+    private async Task FillEmpty()
+    {
+        var inflateSequence = DOTween.Sequence();
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                if (Tiles[x, y].Item != null)
+                    continue;
+                
+                Tiles[x, y].Item = ItemDatabase.Items[Random.Range(0, ItemDatabase.Items.Length)];
+                inflateSequence.Join(Tiles[x, y].icon.transform.DOScale(Vector3.one, TweenDuration));
+            }
+        }
+        await inflateSequence.Play().AsyncWaitForCompletion();
     }
 }
