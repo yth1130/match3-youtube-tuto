@@ -60,4 +60,42 @@ public class Tile : MonoBehaviour
         }
         return result;
     }
+
+    public enum Direction
+    {
+        None,
+        Horizontal,
+        Vertical,
+    }
+
+    public List<Tile> GetConnectedLineTiles(List<Tile> exclude = null, Direction direction = Direction.None)
+    {
+        var result = new List<Tile> { this, };
+        if (exclude == null)
+        {
+            exclude = new List<Tile> { this, };
+        }
+        else
+        {
+            exclude.Add(this);
+        }
+        if (direction == Direction.None || direction == Direction.Horizontal)
+        {
+            if (Left != null && !exclude.Contains(Left) && Left.Item == Item)
+                result.AddRange(Left.GetConnectedLineTiles(exclude, Direction.Horizontal));
+            if (Right != null && !exclude.Contains(Right) && Right.Item == Item)
+                result.AddRange(Right.GetConnectedLineTiles(exclude, Direction.Horizontal));
+        }
+        if (direction == Direction.None && result.Count > 1)
+            return result;
+            
+        if (direction == Direction.None || direction == Direction.Vertical)
+        {
+            if (Top != null && !exclude.Contains(Top) && Top.Item == Item)
+                result.AddRange(Top.GetConnectedLineTiles(exclude, Direction.Vertical));
+            if (Bottom != null && !exclude.Contains(Bottom) && Bottom.Item == Item)
+                result.AddRange(Bottom.GetConnectedLineTiles(exclude, Direction.Vertical));
+        }
+        return result;
+    }
 }
