@@ -101,8 +101,8 @@ public sealed class Board : MonoBehaviour
         if (!Input.GetKeyDown(KeyCode.A))
             return;
         
-        // foreach (var connectedTile in Tiles[0,0].GetConnectedTiles())
-        foreach (var connectedTile in Tiles[0,0].GetConnectedLineTiles())
+        foreach (var connectedTile in Tiles[0,0].GetConnectedTiles())
+        // foreach (var connectedTile in Tiles[0,0].GetConnectedLineTiles())
         {
             connectedTile.icon.transform.DOScale(1.25f, TweenDuration).Play();
         }
@@ -178,7 +178,8 @@ public sealed class Board : MonoBehaviour
             for (int x = 0; x < Width; x++)
             {
                 // if (Tiles[x, y].GetConnectedTiles().Skip(1).Count() >= 2)
-                if (Tiles[x, y].GetConnectedLineTiles().Skip(1).Count() >= 2)
+                if (Tiles[x, y].GetConnectedTiles().Count >= 3)
+                // if (Tiles[x, y].GetConnectedLineTiles().Skip(1).Count() >= 2)
                     return true;
             }
         }
@@ -187,26 +188,19 @@ public sealed class Board : MonoBehaviour
 
     private async void Pop()
     {
+        // 움직인 애들부터 Pop 한다.
+        if (_selection != null && _selection.Count == 2)
+        {
+            await PopTiles(_selection.ToList());
+        }
+
         for (int y = 0; y < Height; y++)
         {
             for (int x = 0; x < Width; x++)
             {
-                var tile = Tiles[x, y];
-
-                // var connectedTiles = tile.GetConnectedTiles();
-                var connectedTiles = tile.GetConnectedLineTiles();
-                
-                if (connectedTiles.Skip(1).Count() < 2)
+                var popResult = await PopTile(Tiles[x, y]);
+                if (popResult == false)
                     continue;
-                
-                audioSource.PlayOneShot(collectSound);
-                ScoreCounter.Instance.Score += tile.Item.value * connectedTiles.Count;
-
-                await PopTiles(connectedTiles);
-
-                await DropUpside(connectedTiles);
-
-                await FillEmpty();
 
                 x = 0;
                 y = 0;
@@ -214,7 +208,51 @@ public sealed class Board : MonoBehaviour
         }
     }
 
-    private async Task PopTiles(List<Tile> connectedTiles)
+    private async Task<bool> PopTile(Tile tile)
+    {
+        // var tile = Tiles[x, y];
+        var connectedTiles = tile.GetConnectedTiles();
+        // var connectedTiles = tile.GetConnectedLineTiles();
+        
+        // if (connectedTiles.Skip(1).Count() < 2)
+        if (connectedTiles.Count < 3)
+            return false;
+
+        audioSource.PlayOneShot(collectSound);
+        ScoreCounter.Instance.Score += tile.Item.value * connectedTiles.Count;
+
+        await DeflateTiles(connectedTiles);
+        await DropUpside(connectedTiles);
+        await FillEmpty();
+
+        return true;
+    }
+
+    private async Task<bool> PopTiles(List<Tile> tiles)
+    {
+        List<Tile> totalConnectedTiles = new List<Tile>();
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            var connectedTiles = tiles[i].GetConnectedTiles();
+            if (connectedTiles.Count < 3)
+                continue;
+            totalConnectedTiles.AddRange(connectedTiles);
+        }
+        if (totalConnectedTiles.Count < 3)
+            return false;
+
+        audioSource.PlayOneShot(collectSound);
+        // TODO: 타일 종류가 다를때 점수?
+        ScoreCounter.Instance.Score += totalConnectedTiles[0].Item.value * totalConnectedTiles.Count;
+
+        await DeflateTiles(totalConnectedTiles);
+        await DropUpside(totalConnectedTiles);
+        await FillEmpty();
+
+        return true;
+    }
+
+    private async Task DeflateTiles(List<Tile> connectedTiles)
     {
         var deflateSequence = DOTween.Sequence();
         foreach (var connectedTile in connectedTiles)
@@ -235,33 +273,150 @@ public sealed class Board : MonoBehaviour
             connectedTile.Item = null;
         }
         var emptyTiles = new List<Tile>(connectedTiles);
-        for (int i = 0; i < emptyTiles.Count; i++)
+        var makeNewItemTiles = new List<Tile>();
+        // for (int i = 0; i < emptyTiles.Count; i++)
+        // {
+        //     var emptyTile = emptyTiles[i];
+
+        //     int dropX = emptyTile.x;
+        //     int dropY = emptyTile.y - 1;
+        //     Tile dropTile = null;
+        //     int dropLength = 0;
+        //     for (; dropY >= 0; dropY--)
+        //     {
+        //         dropLength++;
+        //         if (Tiles[dropX, dropY].Item == null)
+        //             continue;
+        //         dropTile = Tiles[dropX, dropY];
+        //         break;
+        //     }
+        //     if (dropTile == null)
+        //         continue;
+
+        //     emptyTile.icon.sprite = dropTile.icon.sprite;
+        //     Vector3 initPos = emptyTile.transform.position;
+        //     emptyTile.icon.transform.position = dropTile.icon.transform.position;
+        //     emptyTile.icon.transform.localScale = Vector3.one;
+        //     dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * dropLength));
+        //     print($"dropLength:{dropLength}");
+
+        //     emptyTile.Item = dropTile.Item;
+        //     dropTile.Item = null;
+        //     emptyTiles.Add(dropTile);
+        // }
+        while (emptyTiles.Count > 0)
         {
-            var emptyTile = emptyTiles[i];
+            var emptyTile = emptyTiles[0];
+
+            // 밑에 빈 타일이 있는지 확인.
+            int checkX = emptyTile.x;
+            int checkY = emptyTile.y + 1;
+            Tile checkTile;
+            for (; checkY < Height; checkY++)
+            {
+                checkTile = Tiles[checkX, checkY];
+                if (emptyTiles.Contains(checkTile) && checkTile.Item == null)
+                {
+                    emptyTile = Tiles[checkX, checkY];
+                }
+                else
+                {
+                    break;
+                }
+            }
 
             int dropX = emptyTile.x;
             int dropY = emptyTile.y - 1;
             Tile dropTile = null;
+            int dropLength = 0;
             for (; dropY >= 0; dropY--)
             {
+                dropLength++;
                 if (Tiles[dropX, dropY].Item == null)
                     continue;
                 dropTile = Tiles[dropX, dropY];
                 break;
             }
+            // 떨어뜨릴 타일이 없음. 새로 만들어줘야 한다.
             if (dropTile == null)
+            {
+                makeNewItemTiles.Add(emptyTile);
+                emptyTiles.Remove(emptyTile);
                 continue;
+            }
 
             emptyTile.icon.sprite = dropTile.icon.sprite;
             Vector3 initPos = emptyTile.transform.position;
             emptyTile.icon.transform.position = dropTile.icon.transform.position;
             emptyTile.icon.transform.localScale = Vector3.one;
-            dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration));
+            // dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration));
+            // dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * dropLength));
+            dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * (dropLength * 0.5f + 0.5f)));
+            print($"dropLength:{dropLength}");
 
             emptyTile.Item = dropTile.Item;
             dropTile.Item = null;
+            emptyTiles.Remove(emptyTile);
             emptyTiles.Add(dropTile);
         }
+
+        // // 아이템을 새로 만들어줘야할 타일들.
+        // int length = 0;
+        // while(makeNewItemTiles.Count > 0)
+        // {
+        //     var emptyTile = makeNewItemTiles[0];
+        //     // 밑에 빈 타일이 있는지 확인.
+        //     int checkX = emptyTile.x;
+        //     int checkY = emptyTile.y + 1;
+        //     Tile checkTile;
+        //     for (; checkY < Height; checkY++)
+        //     {
+        //         checkTile = Tiles[checkX, checkY];
+        //         if (makeNewItemTiles.Contains(checkTile) && checkTile.Item == null)
+        //             emptyTile = Tiles[checkX, checkY];
+        //         else
+        //             break;
+        //     }
+
+        //     if (length == 0)
+
+        //     int dropX = emptyTile.x;
+        //     int dropY = emptyTile.y - 1;
+        //     Tile dropTile = null;
+        //     int dropLength = 0;
+        //     for (; dropY >= 0; dropY--)
+        //     {
+        //         dropLength++;
+        //         if (Tiles[dropX, dropY].Item == null)
+        //             continue;
+        //         dropTile = Tiles[dropX, dropY];
+        //         break;
+        //     }
+        //     // 떨어뜨릴 타일이 없음. 새로 만들어줘야 한다.
+        //     if (dropTile == null)
+        //     {
+        //         makeNewItemTiles.Add(emptyTile);
+        //         emptyTiles.Remove(emptyTile);
+        //         continue;
+        //     }
+
+        //     emptyTile.icon.sprite = dropTile.icon.sprite;
+        //     Vector3 initPos = emptyTile.transform.position;
+        //     emptyTile.icon.transform.position = dropTile.icon.transform.position;
+        //     emptyTile.icon.transform.localScale = Vector3.one;
+        //     // dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration));
+        //     // dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * dropLength));
+        //     dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * (dropLength * 0.5f + 0.5f)));
+        //     print($"dropLength:{dropLength}");
+
+        //     emptyTile.Item = dropTile.Item;
+        //     dropTile.Item = null;
+        //     emptyTiles.Remove(emptyTile);
+        //     emptyTiles.Add(dropTile);
+        // }
+
+
+
         await dropSequence.Play().AsyncWaitForCompletion();
     }
 
