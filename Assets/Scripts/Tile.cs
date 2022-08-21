@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -83,6 +84,7 @@ public class Tile : MonoBehaviour
                 {
                     print($"line.Count:{line.Count}");
                     lineResult.AddRange(line);
+                    lineResult = lineResult.Distinct().ToList(); // 중복 제거.
                     foreach(var tile in line) 
                         result.Remove(tile);
                 }

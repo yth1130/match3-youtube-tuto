@@ -79,6 +79,11 @@ public sealed class Board : MonoBehaviour
     {
         Tiles = new Tile[rows.Max(row => row.tiles.Count), rows.Count];
 
+        SetTilesItem();
+    }
+
+    public void SetTilesItem()
+    {
         for (int y = 0; y < Height; y++)
         {
             for (int x = 0; x < Width; x++)
@@ -92,7 +97,6 @@ public sealed class Board : MonoBehaviour
                 Tiles[x, y] = tile;
             }
         }
-
         Pop();
     }
 
@@ -223,7 +227,7 @@ public sealed class Board : MonoBehaviour
 
         await DeflateTiles(connectedTiles);
         await DropUpside(connectedTiles);
-        await FillEmpty();
+        // await FillEmpty();
 
         return true;
     }
@@ -247,7 +251,7 @@ public sealed class Board : MonoBehaviour
 
         await DeflateTiles(totalConnectedTiles);
         await DropUpside(totalConnectedTiles);
-        await FillEmpty();
+        // await FillEmpty();
 
         return true;
     }
@@ -274,41 +278,12 @@ public sealed class Board : MonoBehaviour
         }
         var emptyTiles = new List<Tile>(connectedTiles);
         var makeNewItemTiles = new List<Tile>();
-        // for (int i = 0; i < emptyTiles.Count; i++)
-        // {
-        //     var emptyTile = emptyTiles[i];
-
-        //     int dropX = emptyTile.x;
-        //     int dropY = emptyTile.y - 1;
-        //     Tile dropTile = null;
-        //     int dropLength = 0;
-        //     for (; dropY >= 0; dropY--)
-        //     {
-        //         dropLength++;
-        //         if (Tiles[dropX, dropY].Item == null)
-        //             continue;
-        //         dropTile = Tiles[dropX, dropY];
-        //         break;
-        //     }
-        //     if (dropTile == null)
-        //         continue;
-
-        //     emptyTile.icon.sprite = dropTile.icon.sprite;
-        //     Vector3 initPos = emptyTile.transform.position;
-        //     emptyTile.icon.transform.position = dropTile.icon.transform.position;
-        //     emptyTile.icon.transform.localScale = Vector3.one;
-        //     dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * dropLength));
-        //     print($"dropLength:{dropLength}");
-
-        //     emptyTile.Item = dropTile.Item;
-        //     dropTile.Item = null;
-        //     emptyTiles.Add(dropTile);
-        // }
         while (emptyTiles.Count > 0)
         {
             var emptyTile = emptyTiles[0];
 
             // 밑에 빈 타일이 있는지 확인.
+            // 빈 타일들 중 제일 밑으로 간다.
             int checkX = emptyTile.x;
             int checkY = emptyTile.y + 1;
             Tile checkTile;
@@ -325,6 +300,7 @@ public sealed class Board : MonoBehaviour
                 }
             }
 
+            // 위의 타일 중 떨어뜨릴 타일을 찾는다.
             int dropX = emptyTile.x;
             int dropY = emptyTile.y - 1;
             Tile dropTile = null;
@@ -346,13 +322,12 @@ public sealed class Board : MonoBehaviour
             }
 
             emptyTile.icon.sprite = dropTile.icon.sprite;
-            Vector3 initPos = emptyTile.transform.position;
             emptyTile.icon.transform.position = dropTile.icon.transform.position;
             emptyTile.icon.transform.localScale = Vector3.one;
-            // dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration));
-            // dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * dropLength));
-            dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * (dropLength * 0.5f + 0.5f)));
-            print($"dropLength:{dropLength}");
+            dropSequence.Join(emptyTile.icon.transform.DOMove(emptyTile.transform.position, TweenDuration));
+            // dropSequence.Join(emptyTile.icon.transform.DOMove(emptyTile.transform.position, TweenDuration * dropLength));
+            // dropSequence.Join(emptyTile.icon.transform.DOMove(emptyTile.transform.position, TweenDuration * (dropLength * 0.5f + 0.5f)));
+            // print($"dropLength:{dropLength}");
 
             emptyTile.Item = dropTile.Item;
             dropTile.Item = null;
@@ -360,60 +335,59 @@ public sealed class Board : MonoBehaviour
             emptyTiles.Add(dropTile);
         }
 
-        // // 아이템을 새로 만들어줘야할 타일들.
-        // int length = 0;
-        // while(makeNewItemTiles.Count > 0)
-        // {
-        //     var emptyTile = makeNewItemTiles[0];
-        //     // 밑에 빈 타일이 있는지 확인.
-        //     int checkX = emptyTile.x;
-        //     int checkY = emptyTile.y + 1;
-        //     Tile checkTile;
-        //     for (; checkY < Height; checkY++)
-        //     {
-        //         checkTile = Tiles[checkX, checkY];
-        //         if (makeNewItemTiles.Contains(checkTile) && checkTile.Item == null)
-        //             emptyTile = Tiles[checkX, checkY];
-        //         else
-        //             break;
-        //     }
 
-        //     if (length == 0)
 
-        //     int dropX = emptyTile.x;
-        //     int dropY = emptyTile.y - 1;
-        //     Tile dropTile = null;
-        //     int dropLength = 0;
-        //     for (; dropY >= 0; dropY--)
-        //     {
-        //         dropLength++;
-        //         if (Tiles[dropX, dropY].Item == null)
-        //             continue;
-        //         dropTile = Tiles[dropX, dropY];
-        //         break;
-        //     }
-        //     // 떨어뜨릴 타일이 없음. 새로 만들어줘야 한다.
-        //     if (dropTile == null)
-        //     {
-        //         makeNewItemTiles.Add(emptyTile);
-        //         emptyTiles.Remove(emptyTile);
-        //         continue;
-        //     }
 
-        //     emptyTile.icon.sprite = dropTile.icon.sprite;
-        //     Vector3 initPos = emptyTile.transform.position;
-        //     emptyTile.icon.transform.position = dropTile.icon.transform.position;
-        //     emptyTile.icon.transform.localScale = Vector3.one;
-        //     // dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration));
-        //     // dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * dropLength));
-        //     dropSequence.Join(emptyTile.icon.transform.DOMove(initPos, TweenDuration * (dropLength * 0.5f + 0.5f)));
-        //     print($"dropLength:{dropLength}");
+        // 아이템을 새로 만들어줘야할 타일들.
+        while (makeNewItemTiles.Count > 0)
+        {
+            var emptyTile = makeNewItemTiles[0];
+            // 밑에 빈 타일이 있는지 확인.
+            int checkX = emptyTile.x;
+            int checkY = emptyTile.y + 1;
+            Tile checkTile;
+            for (; checkY < Height; checkY++)
+            {
+                checkTile = Tiles[checkX, checkY];
+                if (makeNewItemTiles.Contains(checkTile) && checkTile.Item == null)
+                    emptyTile = Tiles[checkX, checkY];
+                else
+                    break;
+            }
+            int length = 1;
+            // 위에 빈 타일들 가져오기.
+            var columnTiles = new List<Tile>();
+            columnTiles.Add(emptyTile);
+            checkY = emptyTile.y - 1;
+            for (; checkY >= 0; checkY--)
+            {
+                // checkTile = Tiles[checkX, checkY];
+                // if (makeNewItemTiles.Contains)
+                // if (checkTile.Item == null)
+                // length
+                columnTiles.Add(Tiles[checkX, checkY]);
+                length++;
+            }
 
-        //     emptyTile.Item = dropTile.Item;
-        //     dropTile.Item = null;
-        //     emptyTiles.Remove(emptyTile);
-        //     emptyTiles.Add(dropTile);
-        // }
+            // 아이템 만들어서 떨어뜨리기.
+            Tile curTile;
+            var tileInterval = Tiles[1, 0].transform.position - Tiles[0, 1].transform.position;
+            // print($"tileInterval: {tileInterval}");
+            while (columnTiles.Count > 0)
+            {
+                curTile = columnTiles[0];
+
+                curTile.Item = ItemDatabase.Items[Random.Range(0, ItemDatabase.Items.Length)];
+
+                curTile.icon.transform.position = curTile.transform.position + (Vector3.up * tileInterval.y * length);
+                curTile.icon.transform.localScale = Vector3.one;
+                dropSequence.Join(curTile.icon.transform.DOMove(curTile.transform.position, TweenDuration));
+                // dropSequence.Join(curTile.icon.transform.DOMove(curTile.transform.position, TweenDuration * length));
+
+                columnTiles.RemoveAt(0);
+                makeNewItemTiles.Remove(curTile);
+            }
+        }
 
 
 
