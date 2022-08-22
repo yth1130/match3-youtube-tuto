@@ -958,6 +958,7 @@ MonoBehaviour:
   - {fileID: 1703769188}
   - {fileID: 1405182749}
   - {fileID: 926416688}
+  tileInterval: {x: 0, y: 0, z: 0}
   refresh: 0
 --- !u!82 &79322833
 AudioSource:
@@ -7691,6 +7692,7 @@ MonoBehaviour:
   - {fileID: 1310065921}
   - {fileID: 1954544562}
   - {fileID: 162726904}
+  tileInterval: {x: 100, y: 100, z: 0}
   refresh: 0
 --- !u!114 &841219155
 MonoBehaviour:

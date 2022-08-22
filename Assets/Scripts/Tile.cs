@@ -2,9 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class Tile : MonoBehaviour
+public class Tile : MonoBehaviour, IPointerDownHandler
 {
     public int x;
     public int y;
@@ -41,7 +42,13 @@ public class Tile : MonoBehaviour
 
     private void Start()
     {
-        button.onClick.AddListener(() => Board.Instance.Select(this));
+        // button.onClick.AddListener(() => Board.Instance.Select(this));
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        print("Tile.OnPointerDown()");
+        Board.Instance.Select(this);
     }
 
     // public List<Tile> GetConnectedTiles(List<Tile> exclude = null)

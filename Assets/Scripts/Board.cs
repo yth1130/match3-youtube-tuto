@@ -28,6 +28,9 @@ public sealed class Board : MonoBehaviour
 
     private const float TweenDuration = 0.25f;
 
+    public Vector3 tileInterval;
+
+
     private void Awake() => Instance = this;
 
 #if UNITY_EDITOR
@@ -78,6 +81,11 @@ public sealed class Board : MonoBehaviour
     private void Start()
     {
         Tiles = new Tile[rows.Max(row => row.tiles.Count), rows.Count];
+        // tileInterval = Tiles[1, 0].transform.position - Tiles[0, 1].transform.position;
+        // print(transform.GetChild(1).GetChild(0).position);
+        // print(transform.GetChild(0).GetChild(1).position);
+        // tileInterval = transform.GetChild(1).GetChild(0).position - transform.GetChild(0).GetChild(1).position;
+        // print(tileInterval);
 
         SetTilesItem();
     }
@@ -100,22 +108,61 @@ public sealed class Board : MonoBehaviour
         Pop();
     }
 
+    Vector3 clickMousePos = Vector3.zero;
+    Vector3 moveMousePos;
     private void Update()
     {
-        if (!Input.GetKeyDown(KeyCode.A))
-            return;
-        
-        foreach (var connectedTile in Tiles[0,0].GetConnectedTiles())
-        // foreach (var connectedTile in Tiles[0,0].GetConnectedLineTiles())
+        if (Input.GetKeyDown(KeyCode.A))
         {
-            connectedTile.icon.transform.DOScale(1.25f, TweenDuration).Play();
+            foreach (var connectedTile in Tiles[0,0].GetConnectedTiles())
+            // foreach (var connectedTile in Tiles[0,0].GetConnectedLineTiles())
+            {
+                connectedTile.icon.transform.DOScale(1.25f, TweenDuration).Play();
+            }
         }
+        if (Input.GetKey(KeyCode.Mouse0) && _selection.Count == 1)
+        {
+            if (clickMousePos == Vector3.zero)
+            {
+                clickMousePos = Input.mousePosition;
+                return;
+            }
+            else
+            {
+                moveMousePos = Input.mousePosition - clickMousePos;
+                print(moveMousePos);
+                int x = _selection[0].x;
+                int y = _selection[0].y;
+                if (Mathf.Abs(moveMousePos.x) > tileInterval.x)
+                {
+                    if (moveMousePos.x > 0 && x + 1 < Width)
+                        Select(Tiles[x + 1, y]);
+                    if (moveMousePos.x < 0 && x - 1 >= 0)
+                        Select(Tiles[x - 1, y]);
+                    clickMousePos = Vector3.zero;
+                    return;
+                }
+                if (Mathf.Abs(moveMousePos.y) > tileInterval.y)
+                {
+                    if (moveMousePos.y < 0 && y + 1 < Height)
+                        Select(Tiles[x, y + 1]);
+                    if (moveMousePos.y > 0 && y - 1 >= 0)
+                        Select(Tiles[x, y - 1]);
+                    clickMousePos = Vector3.zero;
+                    return;
+                }
+            }
+        }
+
     }
 
     public async void Select(Tile tile)
     {
-        if (_selection.Contains(tile) == false)
-        {
+        if (_selection.Contains(tile) == true)
+            return;
+
+        // if (_selection.Contains(tile) == false)
+        // {
             if (_selection.Count > 0)
             {
                 if (System.Array.IndexOf(_selection[0].Neighbours, tile) != -1)
@@ -127,7 +174,7 @@ public sealed class Board : MonoBehaviour
             {
                 _selection.Add(tile);
             }
-        }
+        // }
 
 
         if (_selection.Count < 2)
@@ -371,7 +418,6 @@ public sealed class Board : MonoBehaviour
 
             // 아이템 만들어서 떨어뜨리기.
             Tile curTile;
-            var tileInterval = Tiles[1, 0].transform.position - Tiles[0, 1].transform.position;
             // print($"tileInterval: {tileInterval}");
             while (columnTiles.Count > 0)
             {
